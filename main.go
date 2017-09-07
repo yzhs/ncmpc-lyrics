@@ -1,39 +1,42 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"html"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"os/user"
 	"path"
 	"strings"
-	//"text/template"
 
 	"github.com/PuerkitoBio/goquery"
+	"github.com/op/go-logging"
 )
 
 func usage() {
 	fmt.Println("Usage: fetch [artist] [title]")
 }
 
+var (
+	log    = logging.MustGetLogger("fetch")
+	format = logging.MustStringFormatter(
+		`%{color}%{time:15:04:05.000} %{shortfunc} ▶ %{level:.4s} %{id:03x}%{color:reset} %{message}`,
+	)
+)
+
 type LyricsFetcher interface {
+	Name() string
 	Fetch(artist, title string) (lyrics string, success bool)
 }
 
-type Local struct {
-}
+type Local struct{}
 
-type Darklyrics struct {
-	baseUrl string
-}
+type Darklyrics struct{ baseUrl string }
 
-type LyricsWiki struct {
-	format string
-}
+type LyricsWiki struct{ format string }
 
 var (
 	homeDir    string
@@ -42,17 +45,25 @@ var (
 	lyricswiki = LyricsWiki{format: "http://lyrics.wikia.com/api.php?action=lyrics&fmt=xml&func=getSong&artist=%s&song=%s"}
 )
 
+func (l Local) Name() string {
+	return "Local"
+}
+
 func (l Local) Fetch(artist string, title string) (lyrics string, success bool) {
 	safeArtist := strings.Replace(artist, "/", "_", -1)
 	safeTitle := strings.Replace(title, "/", "_", -1)
 	lyricsPath := path.Join(homeDir, ".lyrics", fmt.Sprintf("%s - %s.txt", safeArtist, safeTitle))
 	bytes, err := ioutil.ReadFile(lyricsPath)
 	if err != nil {
-		log.Panic(err)
+		log.Debug(err)
 		return "", false
 	}
 
 	return string(bytes), true
+}
+
+func (l Darklyrics) Name() string {
+	return "Darklyrics"
 }
 
 func (dl *Darklyrics) searchForSong(artist string, title string) (songUrl string, songIdOnPage string, success bool) {
@@ -61,21 +72,16 @@ func (dl *Darklyrics) searchForSong(artist string, title string) (songUrl string
 
 	doc, err := goquery.NewDocument(fmt.Sprintf(dl.baseUrl+"search?q=%s+%s", url.QueryEscape(artist), url.QueryEscape(title)))
 	if err != nil {
-		log.Panic(err)
+		log.Warning(err)
 		return "", "", false
 	}
 
 	// Go straight to the links
 	doc.Find("div.sen > h2 > a").EachWithBreak(func(i int, s *goquery.Selection) bool {
-		//linkText := strings.TrimSpace(strings.ToLower(s.Text()))
-		//if !strings.HasPrefix(linkText, artist) || !strings.HasSuffix(linkText, title) {
-		//	//log.Println("Wrong song: ", linkText)
-		//	//return true
-		//}
 		var urlFound bool
 		songUrl, urlFound = s.Attr("href")
 		if !urlFound {
-			log.Println("Not a link")
+			log.Warning("Not a link")
 			return true
 		}
 		tmp := strings.Split(songUrl, "#")
@@ -94,7 +100,7 @@ func (dl *Darklyrics) searchForSong(artist string, title string) (songUrl string
 func (dl *Darklyrics) getLyricsFromUrl(address string, id string) (lyrics string, success bool) {
 	resp, err := http.Get(dl.baseUrl + address)
 	if err != nil {
-		log.Println(err)
+		log.Warning(err)
 		return "", false
 	}
 	defer resp.Body.Close()
@@ -121,7 +127,8 @@ func (dl *Darklyrics) getLyricsFromUrl(address string, id string) (lyrics string
 	// Strip html tags
 	doc, err := goquery.NewDocumentFromReader(strings.NewReader(body))
 	if err != nil {
-		log.Panic(err)
+		log.Warning(err)
+		return "", false
 	}
 
 	// Strip tokens
@@ -137,48 +144,63 @@ func (dl Darklyrics) Fetch(artist, title string) (lyrics string, success bool) {
 	return dl.getLyricsFromUrl(URL, id)
 }
 
+func (l LyricsWiki) Name() string {
+	return "Lyrics Wiki"
+}
+
 func (lw *LyricsWiki) getUrl(artist, title string) (songUrl string, err error) {
-	resp, err := http.Get(fmt.Sprintf(lw.format, artist, title))
+	artist = strings.Replace(artist, "’", "'", -1)
+	title = strings.Replace(title, "’", "'", -1)
+	resp, err := http.Get(fmt.Sprintf(lw.format, url.QueryEscape(artist), url.QueryEscape(title)))
 	if err != nil {
-		log.Println(err)
+		log.Warning(err)
 		return "", err
 	}
 	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromResponse(resp)
 	if err != nil {
-		log.Panic(err)
+		log.Warning(err)
 		return "", err
 	}
 
-	return doc.Find("url").Text(), nil
+	text := doc.Find("url").Text()
+	if text != "" {
+		return text, nil
+	} else {
+		return "", errors.New("Could not determine URL")
+	}
 }
 
 func (lw LyricsWiki) Fetch(artist, title string) (lyrics string, success bool) {
 	url, err := lw.getUrl(artist, title)
 	if err != nil {
-		log.Panic(err)
+		log.Warning(err)
 		return "", false
 	}
 
 	resp, err := http.Get(url)
 	if err != nil {
-		log.Panic(err)
+		log.Warning(err)
 		return "", false
 	}
 	defer resp.Body.Close()
 
 	doc, err := goquery.NewDocumentFromResponse(resp)
 	if err != nil {
-		log.Panic(err)
+		log.Warning(err)
 		return "", false
 	}
 
 	content, err := doc.Find("div.lyricbox").Html()
 	if err != nil {
+		log.Warning(err)
 		return "", false
 	}
 	content = html.UnescapeString(content)
+	if strings.Contains(content, "Category:Instrumental") {
+		return "[Instrumental]", true
+	}
 	content = strings.Replace(content, "<br/>", "\n", -1)
 	content = strings.Replace(content, "<div class=\"lyricsbreak\"></div>", "", -1)
 
@@ -190,6 +212,9 @@ func main() {
 		usage()
 		os.Exit(0)
 	}
+	logging.SetFormatter(format)
+	logging.SetLevel(logging.INFO, "fetch")
+
 	u, err := user.Current()
 	if err != nil {
 		log.Panic(err)
@@ -199,19 +224,16 @@ func main() {
 	artist := os.Args[1]
 	title := os.Args[2]
 
-	var backend LyricsFetcher
+	backends := []LyricsFetcher{local, darklyrics, lyricswiki}
 
-	if strings.Contains(os.Args[0], "-darklyrics") {
-		backend = darklyrics
-	} else if strings.Contains(os.Args[0], "-hd") {
-		backend = local
-	} else {
-		backend = lyricswiki
+	for _, backend := range backends {
+		text, success := backend.Fetch(artist, title)
+		if success {
+			fmt.Println(text)
+			os.Exit(0)
+		}
+		log.Info("Could not find lyrics using backend", backend.Name())
 	}
 
-	text, success := backend.Fetch(artist, title)
-	if !success {
-		os.Exit(1)
-	}
-	fmt.Println(text)
+	os.Exit(69)
 }
