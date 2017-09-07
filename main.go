@@ -26,7 +26,7 @@ func searchForSong(artist string, title string) (songUrl string, songIdOnPage st
 	artist = strings.ToLower(artist)
 	title = strings.ToLower(title)
 
-	doc, err := goquery.NewDocument(fmt.Sprintf(baseUrl + "search?q=%s+%s", url.QueryEscape(artist), url.QueryEscape(title)))
+	doc, err := goquery.NewDocument(fmt.Sprintf(baseUrl+"search?q=%s+%s", url.QueryEscape(artist), url.QueryEscape(title)))
 	if err != nil {
 		log.Panic(err)
 	}
@@ -68,17 +68,17 @@ func getLyricsFromUrl(address string, id string) (lyrics string, success bool) {
 	bodyBytes, err := ioutil.ReadAll(resp.Body)
 	body := string(bodyBytes)
 	i := strings.Index(body, "<h3><a name=\""+id+"\">")
-	if i < 0 {
+	if i < 0 || i > len(body) {
 		return "", false
 	}
 	body = body[i:]
-	i = strings.Index(body, "<br />\n")+len("<br />\n")
-	if i < 0 {
+	i = strings.Index(body, "<br />\n") + len("<br />\n")
+	if i < 0 || i > len(body) {
 		return "", false
 	}
 	body = body[i:]
 	i = strings.Index(body, "<h3>")
-	if i < 0 {
+	if i < 0 || i > len(body) {
 		return "", false
 	}
 	body = body[:i]
@@ -109,12 +109,12 @@ func main() {
 
 	URL, id, success := searchForSong(artist, title)
 	if !success {
-		return
+		os.Exit(1)
 	}
 
 	text, success := getLyricsFromUrl(URL, id)
 	if !success {
-		return
+		os.Exit(1)
 	}
 	fmt.Println(text)
 }
