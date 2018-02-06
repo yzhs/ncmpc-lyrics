@@ -168,7 +168,11 @@ func (lw *LyricsWiki) getUrl(artist, title string) (songUrl string, err error) {
 	if text != "" {
 		return text, nil
 	} else {
-		return "", errors.New("Could not determine URL")
+		if strings.Contains(artist, ",") || strings.Contains(title, ",") {
+			return lw.getUrl(strings.Replace(artist, ",", "", -1), strings.Replace(title, ",", "", -1))
+		} else {
+			return "", errors.New("Could not determine URL")
+		}
 	}
 }
 
