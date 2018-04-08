@@ -89,7 +89,7 @@ func (dl *Darklyrics) getLyricsFromURL(address string, id string) (lyrics string
 
 // Fetch lyrics for the given song
 func (dl Darklyrics) Fetch(artist, title string) (lyrics string, success bool) {
-	URL, id, success := darklyrics.searchForSong(artist, title)
+	URL, id, success := dl.searchForSong(artist, title)
 	if !success {
 		return "", false
 	}
