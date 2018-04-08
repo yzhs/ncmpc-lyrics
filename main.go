@@ -30,6 +30,11 @@ var (
 	backends = []Source{
 		Local{},
 		Darklyrics{baseURL: "http://www.darklyrics.com/"},
+		EncyclopaediaMetallum{
+			baseURL:   "http://www.metal-archives.com/",
+			searchURL: "search/ajax-advanced/searching/songs/?songTitle=%s&bandName=%s&releaseTitle=&lyrics=&genre=",
+			lyricsURL: "release/ajax-view-lyrics/id/%d",
+		},
 		LyricsWiki{format: "http://lyrics.wikia.com/api.php?action=lyrics&fmt=xml&func=getSong&artist=%s&song=%s"},
 	}
 )
@@ -57,7 +62,7 @@ func main() {
 			fmt.Println(text)
 			os.Exit(0)
 		}
-		log.Info("Could not find lyrics using backend", backend.Name())
+		log.Warning("Could not find lyrics using backend", backend.Name())
 	}
 
 	os.Exit(69)
