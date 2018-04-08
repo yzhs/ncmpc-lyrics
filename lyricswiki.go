@@ -11,13 +11,15 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+// LyricsWiki downloads lyrics from lyricswiki.org
 type LyricsWiki struct{ format string }
 
-func (l LyricsWiki) Name() string {
+// Name of this source
+func (lw LyricsWiki) Name() string {
 	return "Lyrics Wiki"
 }
 
-func (lw *LyricsWiki) getUrl(artist, title string) (songUrl string, err error) {
+func (lw *LyricsWiki) getURL(artist, title string) (songURL string, err error) {
 	artist = strings.Replace(artist, "’", "'", -1)
 	title = strings.Replace(title, "’", "'", -1)
 	resp, err := http.Get(fmt.Sprintf(lw.format, url.QueryEscape(artist), url.QueryEscape(title)))
@@ -36,17 +38,17 @@ func (lw *LyricsWiki) getUrl(artist, title string) (songUrl string, err error) {
 	text := doc.Find("url").Text()
 	if text != "" {
 		return text, nil
-	} else {
-		if strings.Contains(artist, ",") || strings.Contains(title, ",") {
-			return lw.getUrl(strings.Replace(artist, ",", "", -1), strings.Replace(title, ",", "", -1))
-		} else {
-			return "", errors.New("Could not determine URL")
-		}
 	}
+
+	if strings.Contains(artist, ",") || strings.Contains(title, ",") {
+		return lw.getURL(strings.Replace(artist, ",", "", -1), strings.Replace(title, ",", "", -1))
+	}
+	return "", errors.New("Could not determine URL")
 }
 
+// Fetch lyrics for this song
 func (lw LyricsWiki) Fetch(artist, title string) (lyrics string, success bool) {
-	url, err := lw.getUrl(artist, title)
+	url, err := lw.getURL(artist, title)
 	if err != nil {
 		log.Warning(err)
 		return "", false

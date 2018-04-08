@@ -10,17 +10,19 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-type Darklyrics struct{ baseUrl string }
+// Darklyrics downloads lyrics from darklyrics.com
+type Darklyrics struct{ baseURL string }
 
-func (l Darklyrics) Name() string {
+// Name of this source
+func (dl Darklyrics) Name() string {
 	return "Darklyrics"
 }
 
-func (dl *Darklyrics) searchForSong(artist string, title string) (songUrl string, songIdOnPage string, success bool) {
+func (dl *Darklyrics) searchForSong(artist string, title string) (songURL string, songIDOnPage string, success bool) {
 	artist = strings.ToLower(artist)
 	title = strings.ToLower(title)
 
-	doc, err := goquery.NewDocument(fmt.Sprintf(dl.baseUrl+"search?q=%s+%s", url.QueryEscape(artist), url.QueryEscape(title)))
+	doc, err := goquery.NewDocument(fmt.Sprintf(dl.baseURL+"search?q=%s+%s", url.QueryEscape(artist), url.QueryEscape(title)))
 	if err != nil {
 		log.Warning(err)
 		return "", "", false
@@ -29,26 +31,26 @@ func (dl *Darklyrics) searchForSong(artist string, title string) (songUrl string
 	// Go straight to the links
 	doc.Find("div.sen > h2 > a").EachWithBreak(func(i int, s *goquery.Selection) bool {
 		var urlFound bool
-		songUrl, urlFound = s.Attr("href")
+		songURL, urlFound = s.Attr("href")
 		if !urlFound {
 			log.Warning("Not a link")
 			return true
 		}
-		tmp := strings.Split(songUrl, "#")
+		tmp := strings.Split(songURL, "#")
 		if len(tmp) != 2 {
 			return true
 		}
-		songUrl = tmp[0]
-		songIdOnPage = tmp[1]
+		songURL = tmp[0]
+		songIDOnPage = tmp[1]
 
 		return false
 	})
 
-	return songUrl, songIdOnPage, songUrl != ""
+	return songURL, songIDOnPage, songURL != ""
 }
 
-func (dl *Darklyrics) getLyricsFromUrl(address string, id string) (lyrics string, success bool) {
-	resp, err := http.Get(dl.baseUrl + address)
+func (dl *Darklyrics) getLyricsFromURL(address string, id string) (lyrics string, success bool) {
+	resp, err := http.Get(dl.baseURL + address)
 	if err != nil {
 		log.Warning(err)
 		return "", false
@@ -85,11 +87,12 @@ func (dl *Darklyrics) getLyricsFromUrl(address string, id string) (lyrics string
 	return strings.TrimSpace(doc.Text()), true
 }
 
+// Fetch lyrics for the given song
 func (dl Darklyrics) Fetch(artist, title string) (lyrics string, success bool) {
 	URL, id, success := darklyrics.searchForSong(artist, title)
 	if !success {
 		return "", false
 	}
 
-	return dl.getLyricsFromUrl(URL, id)
+	return dl.getLyricsFromURL(URL, id)
 }

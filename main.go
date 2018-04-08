@@ -19,7 +19,8 @@ var (
 	)
 )
 
-type LyricsFetcher interface {
+// Source prodides an interface for fetching lyrics from somewhere
+type Source interface {
 	Name() string
 	Fetch(artist, title string) (lyrics string, success bool)
 }
@@ -27,7 +28,7 @@ type LyricsFetcher interface {
 var (
 	homeDir    string
 	local      = Local{}
-	darklyrics = Darklyrics{baseUrl: "http://www.darklyrics.com/"}
+	darklyrics = Darklyrics{baseURL: "http://www.darklyrics.com/"}
 	lyricswiki = LyricsWiki{format: "http://lyrics.wikia.com/api.php?action=lyrics&fmt=xml&func=getSong&artist=%s&song=%s"}
 )
 
@@ -48,7 +49,7 @@ func main() {
 	artist := os.Args[1]
 	title := os.Args[2]
 
-	backends := []LyricsFetcher{local, darklyrics, lyricswiki}
+	backends := []Source{local, darklyrics, lyricswiki}
 
 	for _, backend := range backends {
 		text, success := backend.Fetch(artist, title)

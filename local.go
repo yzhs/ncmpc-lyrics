@@ -7,12 +7,15 @@ import (
 	"strings"
 )
 
+// Local fetches lyrics from ~/.lyrics
 type Local struct{}
 
+// Name of this source
 func (l Local) Name() string {
 	return "Local"
 }
 
+// Fetch lyrics for the given song from ~/.lyrics
 func (l Local) Fetch(artist string, title string) (lyrics string, success bool) {
 	safeArtist := strings.Replace(artist, "/", "_", -1)
 	safeTitle := strings.Replace(title, "/", "_", -1)
