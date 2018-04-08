@@ -26,10 +26,12 @@ type Source interface {
 }
 
 var (
-	homeDir    string
-	local      = Local{}
-	darklyrics = Darklyrics{baseURL: "http://www.darklyrics.com/"}
-	lyricswiki = LyricsWiki{format: "http://lyrics.wikia.com/api.php?action=lyrics&fmt=xml&func=getSong&artist=%s&song=%s"}
+	homeDir  string
+	backends = []Source{
+		Local{},
+		Darklyrics{baseURL: "http://www.darklyrics.com/"},
+		LyricsWiki{format: "http://lyrics.wikia.com/api.php?action=lyrics&fmt=xml&func=getSong&artist=%s&song=%s"},
+	}
 )
 
 func main() {
@@ -48,8 +50,6 @@ func main() {
 
 	artist := os.Args[1]
 	title := os.Args[2]
-
-	backends := []Source{local, darklyrics, lyricswiki}
 
 	for _, backend := range backends {
 		text, success := backend.Fetch(artist, title)
