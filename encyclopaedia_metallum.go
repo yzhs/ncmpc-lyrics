@@ -84,7 +84,9 @@ func (em *EncyclopaediaMetallum) getLyricsFromURL(id int) (lyrics string, succes
 	body := strings.Replace(string(bodyBytes), "<br />", "", -1)
 
 	// Strip tokens
-	return strings.TrimSpace(body), true
+	lyrics = strings.TrimSpace(body)
+
+	return lyrics, lyrics != "<em>(lyrics not available)</em>"
 }
 
 // Fetch lyrics for the given song
